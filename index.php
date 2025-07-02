@@ -1,0 +1,30 @@
+<?php include 'menu.php'; 
+include 'conexion.php';
+include 'boton_flotante.php';
+?>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Bienvenido | Tablero VW</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    @font-face {font-family: 'VWText';src: url('VWText-Regular.otf');font-weight: 400;}
+    @font-face {font-family: 'VWHead';src: url('VWHead-Regular.otf');font-weight: 400;}
+    body {font-family: 'VWText', Arial, sans-serif;background-color: #f4f8fb;color: #232b38;}
+    h1 {font-family: 'VWHead', 'VWText', Arial, sans-serif;font-weight: 700;font-size: 2.1rem;text-align: center;margin-bottom: 20px;color: #001e50;}
+    .main-content {margin-left: 170px;}
+    @media (max-width: 991px) {.main-content {margin-left: 60px;}}
+    @media (max-width: 600px) {.main-content {margin-left: 0;}}
+  </style>
+</head>
+<body>
+  <div class="main-content container py-4">
+    <img src="assets/vwlogo.png" alt="vw-logo" class="vw-logo mx-auto d-block">
+    <h1 class="mb-4 text-center fw-bold text-primary">Bienvenido al Tablero de Control del Taller VW</h1>
+    <div class="alert alert-info text-center">
+      Elegí una opción en el menú lateral para comenzar.
+    </div>
+  </div>
+</body>
+</html>
