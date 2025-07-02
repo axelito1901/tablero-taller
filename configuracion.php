@@ -1,5 +1,6 @@
 <?php include 'menu.php';
 include 'boton_flotante.php';
+?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -9,7 +10,7 @@ include 'boton_flotante.php';
   <style>
     @font-face {font-family: 'VWText';src: url('VWText-Regular.otf');font-weight: 400;}
     @font-face {font-family: 'VWHead';src: url('VWHead-Regular.otf');font-weight: 400;}
-    body {font-family: 'VWText', Arial, sans-serif;background-color: #f4f8fb;color: #232b38;}
+    body {font-family: 'VWText', Arial, sans-serif;background-color: #f4f8fb;color: #232b38;
     h1 {font-family: 'VWHead', 'VWText', Arial, sans-serif;font-weight: 700;font-size: 2.1rem;text-align: center;margin-bottom: 20px;color: #001e50;}
     .main-content {margin-left: 170px;}
     @media (max-width: 991px) {.main-content {margin-left: 60px;}}
@@ -23,4 +24,3 @@ include 'boton_flotante.php';
   </div>
 </body>
 </html>
- ?>
