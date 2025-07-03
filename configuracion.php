@@ -21,6 +21,13 @@ include 'boton_flotante.php';
   <div class="main-content container py-4">
     <h1 class="mb-4 text-center fw-bold text-primary">Configuración</h1>
     <p>Pendiente...</p>
+
+    <form method="post" enctype="multipart/form-data">
+      <label>Seleccionar backup (.sql):</label>
+        <input type="file" name="backup_sql" accept=".sql" required>
+          <br><br>
+            <button type="submit" name="restaurar">Restaurar Base de Datos</button>
+    </form>
   </div>
 </body>
 </html>

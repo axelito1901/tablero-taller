@@ -1,14 +1,13 @@
 <?php
 require_once 'conexion.php';
 
-$exito = false;
-$error = false;
+$exito = '';
+$error = '';
 
 // --- LÓGICA ELIMINAR ---
 if (isset($_POST['eliminar_id'])) {
   $id = intval($_POST['eliminar_id']);
   if ($id) {
-    // Chequear si tiene órdenes asociadas
     $stmtCheck = $conn->prepare("SELECT COUNT(*) FROM ordenes_trabajo WHERE mecanico_id = ?");
     $stmtCheck->bind_param("i", $id);
     $stmtCheck->execute();
@@ -21,8 +20,8 @@ if (isset($_POST['eliminar_id'])) {
       $stmt = $conn->prepare("DELETE FROM mecanicos WHERE id = ?");
       $stmt->bind_param("i", $id);
       $stmt->execute();
-      $exito = true;
-      header("Location: editor_mecanicos.php?exito=1");
+      $exito = "Mecánico eliminado correctamente.";
+      header("Location: editor_mecanicos.php?exito=" . urlencode($exito));
       exit;
     }
   }
@@ -32,19 +31,32 @@ if (isset($_POST['eliminar_id'])) {
 if (isset($_POST['agregar'])) {
   $nombre = trim($_POST['nombre'] ?? '');
   $legajo = trim($_POST['legajo'] ?? '');
-  if ($nombre && $legajo) {
+  // DEBUG:
+  if (!$nombre || !$legajo) {
+    $error = "Faltan datos.";
+  } else if (!ctype_digit($legajo)) {
+    $error = "El legajo debe ser solo números.";
+  } else {
     // Evita duplicados por legajo
     $stmt = $conn->prepare("SELECT id FROM mecanicos WHERE legajo = ?");
     $stmt->bind_param("s", $legajo);
     $stmt->execute();
     $stmt->store_result();
     if ($stmt->num_rows == 0) {
-      $stmt2 = $conn->prepare("INSERT INTO mecanicos (nombre, legajo) VALUES (?, ?)");
-      $stmt2->bind_param("ss", $nombre, $legajo);
-      $stmt2->execute();
-      $exito = true;
-      header("Location: editor_mecanicos.php?exito=1");
-      exit;
+      // DEBUG antes del insert:
+      if (!$conn->prepare("INSERT INTO mecanicos (nombre, legajo) VALUES (?, ?)")) {
+        $error = "ERROR PREPARANDO INSERT: " . $conn->error;
+      } else {
+        $stmt2 = $conn->prepare("INSERT INTO mecanicos (nombre, legajo) VALUES (?, ?)");
+        $stmt2->bind_param("ss", $nombre, $legajo);
+        if ($stmt2->execute()) {
+          $exito = "Mecánico agregado correctamente.";
+          header("Location: editor_mecanicos.php?exito=" . urlencode($exito));
+          exit;
+        } else {
+          $error = "ERROR AL AGREGAR: " . $stmt2->error;
+        }
+      }
     } else {
       $error = "Ya existe un mecánico con ese legajo.";
     }
@@ -58,29 +70,34 @@ if (isset($_POST['editar_id'], $_POST['editar_nombre'], $_POST['editar_legajo'])
   $nombre = trim($_POST['editar_nombre']);
   $legajo = trim($_POST['editar_legajo']);
   if ($id && $nombre && $legajo) {
-    // Verificar que no exista ese legajo en otro mecánico
-    $stmt = $conn->prepare("SELECT id FROM mecanicos WHERE legajo = ? AND id <> ?");
-    $stmt->bind_param("si", $legajo, $id);
-    $stmt->execute();
-    $stmt->store_result();
-    if ($stmt->num_rows == 0) {
-      $stmt2 = $conn->prepare("UPDATE mecanicos SET nombre = ?, legajo = ? WHERE id = ?");
-      $stmt2->bind_param("ssi", $nombre, $legajo, $id);
-      $stmt2->execute();
-      $exito = true;
-      header("Location: editor_mecanicos.php?exito=1");
-      exit;
+    if (!preg_match('/^\d+$/', $legajo)) {
+      $error = "El legajo debe ser solo números.";
     } else {
-      $error = "Ya existe otro mecánico con ese legajo.";
+      $stmt = $conn->prepare("SELECT id FROM mecanicos WHERE legajo = ? AND id <> ?");
+      $stmt->bind_param("si", $legajo, $id);
+      $stmt->execute();
+      $stmt->store_result();
+      if ($stmt->num_rows == 0) {
+        $stmt2 = $conn->prepare("UPDATE mecanicos SET nombre = ?, legajo = ? WHERE id = ?");
+        $stmt2->bind_param("ssi", $nombre, $legajo, $id);
+        $stmt2->execute();
+        $exito = "Mecánico editado correctamente.";
+        header("Location: editor_mecanicos.php?exito=" . urlencode($exito));
+        exit;
+      } else {
+        $error = "Ya existe otro mecánico con ese legajo.";
+      }
+      $stmt->close();
     }
-    $stmt->close();
+  } else {
+    $error = "Completá todos los campos.";
   }
 }
 
 // Mensaje de éxito al volver del redirect
-if (isset($_GET['exito'])) $exito = true;
+if (isset($_GET['exito'])) $exito = htmlspecialchars($_GET['exito']);
 
-// Avatar helpers (igual que antes)
+// Avatar helpers
 function vwAvatarInitials($n) {
   $n = explode(' ', strtoupper($n)); return $n[0][0].($n[1][0]??'');
 }
@@ -139,20 +156,22 @@ include 'boton_flotante.php';
       background: #e3f9db; color: #278337; border-radius: 12px; padding: 13px 18px; font-size: 1.08rem;
       margin-bottom: 1.2rem; display: flex; align-items: center; gap: 10px; border: 0;
       box-shadow: 0 2px 14px rgba(60,190,90,0.05);
+      opacity: 1; transition: opacity .7s;
     }
     .vw-alert svg { width: 1.2em; height: 1.2em; color: #84b600;}
     .vw-alert.vw-error {
-      background: #fde2e3; color: #b31730;
-      font-weight: bold;
+      background: #fde2e3; color: #b31730; font-weight: bold;
     }
     .vw-form-row {
       display: flex; gap: 15px; margin-bottom: 0.6rem;
     }
-    .vw-form-row input[type="text"] {
+    .vw-form-row input[type="text"],
+    .vw-form-row input[type="number"] {
       flex: 1 1 220px; min-width: 120px; padding: 0.85em 1.1em;
       font-size: 1.07rem; border: 1.5px solid #e2ebf7; border-radius: 10px;
       background: #f7fafd; transition: border .17s;
     }
+    .vw-form-row input.error { border: 2px solid #e42a2a !important; background: #fbecec; }
     .vw-btn-add {
       background: #1875d2; color: #fff;
       border: none; border-radius: 10px; padding: 0.85em 1.3em;
@@ -162,7 +181,8 @@ include 'boton_flotante.php';
       transition: background .17s, box-shadow .18s;
     }
     .vw-btn-add svg { width: 1.2em; height: 1.2em; color: #ffe200; }
-    .vw-btn-add:hover { background: #1152a6;}
+    .vw-btn-add:disabled { background: #c6d7ef; color: #fff; opacity: .7; cursor: not-allowed; }
+    .vw-btn-add:hover:not(:disabled) { background: #1152a6;}
     .vw-search-row {
       margin-bottom: 1.2rem;
       display: flex;
@@ -195,7 +215,19 @@ include 'boton_flotante.php';
     }
     tbody tr {
       background: #f7fafd;
-      transition: background .14s;
+      transition: background .14s, opacity .5s;
+    }
+    tbody tr.removed {
+      opacity: 0.05;
+      transition: opacity 0.6s;
+    }
+    tbody tr.added {
+      background: #d1f7e3 !important;
+      animation: fadeInRow .8s;
+    }
+    @keyframes fadeInRow {
+      from { opacity: 0; background: #e9fff2;}
+      to   { opacity: 1; background: #f7fafd;}
     }
     tbody tr:hover {
       background: #e4f0fa;
@@ -251,25 +283,25 @@ include 'boton_flotante.php';
     </div>
 
     <?php if ($error): ?>
-      <div class="vw-alert vw-error">
+      <div class="vw-alert vw-error" id="vwErrorAlert">
         <svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
         <?= htmlspecialchars($error) ?>
       </div>
     <?php endif; ?>
 
     <?php if ($exito): ?>
-      <div class="vw-alert">
+      <div class="vw-alert" id="vwSuccessAlert">
         <svg fill="currentColor" viewBox="0 0 20 20"><path d="M13.28 2.71a1 1 0 011.41 1.42L4.12 14.7a1 1 0 01-1.41-1.41L13.28 2.71zM3 12a9 9 0 1114 0 9 9 0 01-14 0z"/></svg>
-        Cambios guardados.
+        <?= $exito ?>
       </div>
     <?php endif; ?>
 
-    <form method="post" class="vw-form-row" style="margin-bottom:1.3rem;">
-      <input type="text" name="nombre" placeholder="Nombre completo" required>
-      <input type="text" name="legajo" placeholder="Legajo" required>
-      <button class="vw-btn-add" type="submit" name="agregar">
+    <form method="post" class="vw-form-row" style="margin-bottom:1.3rem;" id="formAltaMecanico" autocomplete="off">
+      <input type="text" name="nombre" id="inputNombre" placeholder="Nombre completo" required>
+      <input type="number" name="legajo" id="inputLegajo" placeholder="Legajo" required min="1" step="1">
+      <button class="vw-btn-add" id="btnAgregar" type="submit" name="agregar">
         <svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-    Agregar
+        Agregar
       </button>
     </form>
 
@@ -297,7 +329,7 @@ include 'boton_flotante.php';
                     <input type="text" name="editar_nombre" value="<?= htmlspecialchars($m['nombre']) ?>" required class="form-control">
                     <input type="hidden" name="editar_id" value="<?= $m['id'] ?>">
                   </td>
-                  <td><input type="text" name="editar_legajo" value="<?= htmlspecialchars($m['legajo']) ?>" required class="form-control"></td>
+                  <td><input type="number" name="editar_legajo" value="<?= htmlspecialchars($m['legajo']) ?>" required class="form-control"></td>
                   <td class="vw-table-actions">
                     <button type="submit" class="vw-btn-guardar">Guardar</button>
                     <a href="editor_mecanicos.php" class="vw-btn-cancelar">Cancelar</a>
@@ -331,6 +363,51 @@ include 'boton_flotante.php';
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
+// --- UX: Oculta las alertas después de 2.5 segundos ---
+setTimeout(function() {
+  document.querySelectorAll('.vw-alert').forEach(function(el){
+    el.style.opacity = '0';
+    setTimeout(()=>el.style.display='none', 700);
+  });
+}, 2500);
+
+// Validación visual en tiempo real
+const inputNombre = document.getElementById('inputNombre');
+const inputLegajo = document.getElementById('inputLegajo');
+const btnAgregar = document.getElementById('btnAgregar');
+const formAlta = document.getElementById('formAltaMecanico');
+
+[inputNombre, inputLegajo].forEach(input => {
+  input.addEventListener('input', () => {
+    input.classList.remove('error');
+  });
+});
+
+// Validar antes de submit
+formAlta.addEventListener('submit', function(e){
+  let ok = true;
+  [inputNombre, inputLegajo].forEach(input => {
+    if(!input.value.trim()) {
+      input.classList.add('error');
+      ok = false;
+    }
+  });
+  if(inputLegajo.value && !/^\d+$/.test(inputLegajo.value)) {
+    inputLegajo.classList.add('error');
+    ok = false;
+  }
+  if(!ok) {
+    e.preventDefault();
+    return false;
+  }
+  btnAgregar.disabled = true;
+});
+
+// Enter en legajo manda submit
+inputLegajo.addEventListener('keydown', function(e){
+  if(e.key === "Enter") formAlta.requestSubmit();
+});
+
 // Buscador en vivo
 document.getElementById('buscadorMecanico').addEventListener('input', function() {
   let v = this.value.trim().toLowerCase();
@@ -374,15 +451,6 @@ document.getElementById('exportarExcel').onclick = function() {
   XLSX.utils.book_append_sheet(wb, ws, "Mecanicos");
   XLSX.writeFile(wb, "MecanicosVW.xlsx");
 };
-
-// Oculta las alertas después de 3 segundos (3000ms)
-setTimeout(function() {
-  document.querySelectorAll('.vw-alert').forEach(function(el){
-    el.style.transition = 'opacity 0.6s';
-    el.style.opacity = '0';
-    setTimeout(()=>el.style.display='none', 700);
-  });
-}, 3000);
 </script>
 </body>
 </html>
