@@ -12,7 +12,7 @@ if (isset($_POST['restaurar']) && isset($_FILES['backup_sql'])) {
     $base_de_datos = 'tablero_php';
 
     // Ruta a mysql.exe (F:\ en tu caso)
-    $mysql = '"F:\\xampp\\mysql\\bin\\mysql.exe"';
+    $mysql = '"C:\\xampp\\mysql\\bin\\mysql.exe"';
 
     // Comando para restaurar la base de datos
     $comando = "$mysql --host=$host --user=$usuario --password=$contraseña $base_de_datos < \"$archivo_tmp\"";

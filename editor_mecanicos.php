@@ -1,13 +1,93 @@
 <?php
 require_once 'conexion.php';
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
 
-$exito = '';
-$error = '';
+// DEBUG: Muestra los datos POST
+if (!empty($_POST)) {
+    echo '<pre style="background: #ffe;">POST: ';
+    print_r($_POST);
+    echo '</pre>';
+}
 
-// --- LÓGICA ELIMINAR ---
-if (isset($_POST['eliminar_id'])) {
+// Variables de estado
+$exito = false;
+$error = false;
+
+// --- AGREGAR ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['agregar'])) {
+  $nombre = trim($_POST['nombre'] ?? '');
+  $legajo = trim($_POST['legajo'] ?? '');
+
+  if ($nombre && $legajo) {
+    if (!ctype_digit($legajo)) {
+      $error = "El legajo debe ser solo números.";
+    } else {
+      // Chequea que no exista ese legajo
+      $stmt = $conn->prepare("SELECT id FROM mecanicos WHERE legajo = ?");
+      $stmt->bind_param("s", $legajo);
+      $stmt->execute();
+      $stmt->store_result();
+      if ($stmt->num_rows == 0) {
+        $stmt2 = $conn->prepare("INSERT INTO mecanicos (nombre, legajo) VALUES (?, ?)");
+        $stmt2->bind_param("ss", $nombre, $legajo);
+        if ($stmt2->execute()) {
+          header("Location: editor_mecanicos.php?exito=ok");
+          exit;
+        } else {
+          $error = "Error al agregar: " . $stmt2->error;
+        }
+        $stmt2->close();
+      } else {
+        $error = "Ya existe un mecánico con ese legajo.";
+      }
+      $stmt->close();
+    }
+  } else {
+    $error = "Completá todos los campos.";
+  }
+}
+
+// --- EDITAR ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['editar_id'], $_POST['editar_nombre'], $_POST['editar_legajo'])) {
+  $id = intval($_POST['editar_id']);
+  $nombre = trim($_POST['editar_nombre']);
+  $legajo = trim($_POST['editar_legajo']);
+
+  if ($id && $nombre && $legajo) {
+    if (!ctype_digit($legajo)) {
+      $error = "El legajo debe ser solo números.";
+    } else {
+      // Chequea que no exista ese legajo en otro registro
+      $stmt = $conn->prepare("SELECT id FROM mecanicos WHERE legajo = ? AND id <> ?");
+      $stmt->bind_param("si", $legajo, $id);
+      $stmt->execute();
+      $stmt->store_result();
+      if ($stmt->num_rows == 0) {
+        $stmt2 = $conn->prepare("UPDATE mecanicos SET nombre = ?, legajo = ? WHERE id = ?");
+        $stmt2->bind_param("ssi", $nombre, $legajo, $id);
+        if ($stmt2->execute()) {
+          header("Location: editor_mecanicos.php?exito=editado");
+          exit;
+        } else {
+          $error = "Error al editar: " . $stmt2->error;
+        }
+        $stmt2->close();
+      } else {
+        $error = "Ya existe otro mecánico con ese legajo.";
+      }
+      $stmt->close();
+    }
+  } else {
+    $error = "Completá todos los campos.";
+  }
+}
+
+// --- ELIMINAR ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['eliminar_id'])) {
   $id = intval($_POST['eliminar_id']);
   if ($id) {
+    // Chequear si tiene órdenes asociadas
     $stmtCheck = $conn->prepare("SELECT COUNT(*) FROM ordenes_trabajo WHERE mecanico_id = ?");
     $stmtCheck->bind_param("i", $id);
     $stmtCheck->execute();
@@ -19,83 +99,26 @@ if (isset($_POST['eliminar_id'])) {
     } else {
       $stmt = $conn->prepare("DELETE FROM mecanicos WHERE id = ?");
       $stmt->bind_param("i", $id);
-      $stmt->execute();
-      $exito = "Mecánico eliminado correctamente.";
-      header("Location: editor_mecanicos.php?exito=" . urlencode($exito));
-      exit;
-    }
-  }
-}
-
-// --- LÓGICA AGREGAR ---
-if (isset($_POST['agregar'])) {
-  $nombre = trim($_POST['nombre'] ?? '');
-  $legajo = trim($_POST['legajo'] ?? '');
-  // DEBUG:
-  if (!$nombre || !$legajo) {
-    $error = "Faltan datos.";
-  } else if (!ctype_digit($legajo)) {
-    $error = "El legajo debe ser solo números.";
-  } else {
-    // Evita duplicados por legajo
-    $stmt = $conn->prepare("SELECT id FROM mecanicos WHERE legajo = ?");
-    $stmt->bind_param("s", $legajo);
-    $stmt->execute();
-    $stmt->store_result();
-    if ($stmt->num_rows == 0) {
-      // DEBUG antes del insert:
-      if (!$conn->prepare("INSERT INTO mecanicos (nombre, legajo) VALUES (?, ?)")) {
-        $error = "ERROR PREPARANDO INSERT: " . $conn->error;
-      } else {
-        $stmt2 = $conn->prepare("INSERT INTO mecanicos (nombre, legajo) VALUES (?, ?)");
-        $stmt2->bind_param("ss", $nombre, $legajo);
-        if ($stmt2->execute()) {
-          $exito = "Mecánico agregado correctamente.";
-          header("Location: editor_mecanicos.php?exito=" . urlencode($exito));
-          exit;
-        } else {
-          $error = "ERROR AL AGREGAR: " . $stmt2->error;
-        }
-      }
-    } else {
-      $error = "Ya existe un mecánico con ese legajo.";
-    }
-    $stmt->close();
-  }
-}
-
-// --- LÓGICA EDITAR ---
-if (isset($_POST['editar_id'], $_POST['editar_nombre'], $_POST['editar_legajo'])) {
-  $id = intval($_POST['editar_id']);
-  $nombre = trim($_POST['editar_nombre']);
-  $legajo = trim($_POST['editar_legajo']);
-  if ($id && $nombre && $legajo) {
-    if (!preg_match('/^\d+$/', $legajo)) {
-      $error = "El legajo debe ser solo números.";
-    } else {
-      $stmt = $conn->prepare("SELECT id FROM mecanicos WHERE legajo = ? AND id <> ?");
-      $stmt->bind_param("si", $legajo, $id);
-      $stmt->execute();
-      $stmt->store_result();
-      if ($stmt->num_rows == 0) {
-        $stmt2 = $conn->prepare("UPDATE mecanicos SET nombre = ?, legajo = ? WHERE id = ?");
-        $stmt2->bind_param("ssi", $nombre, $legajo, $id);
-        $stmt2->execute();
-        $exito = "Mecánico editado correctamente.";
-        header("Location: editor_mecanicos.php?exito=" . urlencode($exito));
+      if ($stmt->execute()) {
+        header("Location: editor_mecanicos.php?exito=eliminado");
         exit;
       } else {
-        $error = "Ya existe otro mecánico con ese legajo.";
+        $error = "Error al eliminar: " . $stmt->error;
       }
       $stmt->close();
     }
-  } else {
-    $error = "Completá todos los campos.";
   }
 }
 
-// Mensaje de éxito al volver del redirect
-if (isset($_GET['exito'])) $exito = htmlspecialchars($_GET['exito']);
+// Mensaje de éxito (por GET)
+if (isset($_GET['exito'])) {
+  switch ($_GET['exito']) {
+    case 'ok': $exito = "Mecánico agregado correctamente."; break;
+    case 'editado': $exito = "Mecánico editado correctamente."; break;
+    case 'eliminado': $exito = "Mecánico eliminado correctamente."; break;
+    default: $exito = htmlspecialchars($_GET['exito']);
+  }
+}
 
 // Avatar helpers
 function vwAvatarInitials($n) {
@@ -106,6 +129,7 @@ function vwAvatarColor($n) {
   $hash = abs(crc32($n)); return $vwColors[$hash % count($vwColors)];
 }
 
+// INCLUYE EL MENU Y DEMÁS DESPUÉS DE TODO EL PROCESAMIENTO!
 include 'menu.php';
 include 'boton_flotante.php';
 ?>
@@ -363,7 +387,6 @@ include 'boton_flotante.php';
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
-// --- UX: Oculta las alertas después de 2.5 segundos ---
 setTimeout(function() {
   document.querySelectorAll('.vw-alert').forEach(function(el){
     el.style.opacity = '0';
@@ -383,31 +406,6 @@ const formAlta = document.getElementById('formAltaMecanico');
   });
 });
 
-// Validar antes de submit
-formAlta.addEventListener('submit', function(e){
-  let ok = true;
-  [inputNombre, inputLegajo].forEach(input => {
-    if(!input.value.trim()) {
-      input.classList.add('error');
-      ok = false;
-    }
-  });
-  if(inputLegajo.value && !/^\d+$/.test(inputLegajo.value)) {
-    inputLegajo.classList.add('error');
-    ok = false;
-  }
-  if(!ok) {
-    e.preventDefault();
-    return false;
-  }
-  btnAgregar.disabled = true;
-});
-
-// Enter en legajo manda submit
-inputLegajo.addEventListener('keydown', function(e){
-  if(e.key === "Enter") formAlta.requestSubmit();
-});
-
 // Buscador en vivo
 document.getElementById('buscadorMecanico').addEventListener('input', function() {
   let v = this.value.trim().toLowerCase();
@@ -417,6 +415,7 @@ document.getElementById('buscadorMecanico').addEventListener('input', function()
     tr.style.display = (nom.includes(v) || leg.includes(v)) ? '' : 'none';
   });
 });
+
 // Modal Eliminar
 document.querySelectorAll('.vw-btn-eliminar').forEach(btn=>{
   btn.onclick = function(e){
@@ -438,6 +437,7 @@ document.querySelectorAll('.vw-btn-eliminar').forEach(btn=>{
     });
   }
 });
+
 // Exportar a Excel
 document.getElementById('exportarExcel').onclick = function() {
   let data = [["Nombre", "Legajo"]];
